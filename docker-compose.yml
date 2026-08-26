@@ -15,7 +15,7 @@ services:
     container_name: tecgated
     restart: unless-stopped
     depends_on:
-      - dockerwacht
+      - dockerguard
     ports:
       - "80:80"
       - "443:443"
@@ -23,16 +23,16 @@ services:
       - "8091:8091"   # same, over TLS
     volumes:
       - ./data:/data
-      - wachtsocket:/wacht
-      - inhaltsziele:/inhaltsziele
+      - guardsocket:/guard
+      - contenttargets:/contenttargets
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is missing - see .env.example}
       LOKALE_DOCKER_ADRESSE: ${LAN_ADDRESS:?LAN_ADDRESS is missing - see .env.example}
       ZERT_NAMEN: ${CERT_NAMES:?CERT_NAMES is missing - see .env.example}
-      DOCKER_SOCKET: /wacht/docker.sock
-      INHALT_ZIEL_VERZEICHNIS: /inhaltsziele
-      INHALT_ZAEHLER_QUELLE: http://inhaltswache:8096/zaehler
-      INHALT_TREFFER_QUELLE: http://inhaltswache:8096/treffer
+      DOCKER_SOCKET: /guard/docker.sock
+      INHALT_ZIEL_VERZEICHNIS: /contenttargets
+      INHALT_ZAEHLER_QUELLE: http://contentguard:8096/zaehler
+      INHALT_TREFFER_QUELLE: http://contentguard:8096/treffer
       LOG_STUFE: INFO
       GOMEMLIMIT: 450MiB
     mem_limit: 1g
@@ -48,19 +48,19 @@ services:
   # Reads the Docker socket so the interface can list your containers.
   # It passes exactly two read-only routes through and discards the rest,
   # so that a mounted socket does not mean "root on the host".
-  dockerwacht:
+  dockerguard:
     image: amslertec/tecgate:${TECGATE_VERSION:-latest}
-    container_name: dockerwacht
-    entrypoint: ["/usr/local/bin/dockerwacht"]
+    container_name: dockerguard
+    entrypoint: ["/usr/local/bin/dockerguard"]
     restart: unless-stopped
     network_mode: none
     read_only: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - wachtsocket:/wacht
+      - guardsocket:/guard
     environment:
       DOCKER_SOCKET: /var/run/docker.sock
-      WACHT_SOCKET: /wacht/docker.sock
+      WACHT_SOCKET: /guard/docker.sock
       LOG_STUFE: INFO
     # The socket belongs to a group whose number differs per host.
     # Without it the container page stays empty.
@@ -82,16 +82,16 @@ services:
 
   # Coraza with the OWASP Core Rule Set. Only used by hosts where you
   # switch content inspection on; it listens on no published port.
-  inhaltswache:
+  contentguard:
     image: amslertec/tecgate:${TECGATE_VERSION:-latest}
-    container_name: inhaltswache
-    entrypoint: ["/usr/local/bin/inhaltswache"]
+    container_name: contentguard
+    entrypoint: ["/usr/local/bin/contentguard"]
     restart: unless-stopped
     read_only: true
     volumes:
-      - inhaltsziele:/inhaltsziele:ro
+      - contenttargets:/contenttargets:ro
     environment:
-      INHALT_ZIELTABELLE: /inhaltsziele/zieltabelle.json
+      INHALT_ZIELTABELLE: /contenttargets/zieltabelle.json
       INHALT_ADRESSE: ":8095"
       INHALT_ZAEHLER_ADRESSE: ":8096"
       LOG_STUFE: INFO
@@ -110,5 +110,5 @@ services:
         max-file: "5"
 
 volumes:
-  wachtsocket:
-  inhaltsziele:
+  guardsocket:
+  contenttargets:

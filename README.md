@@ -87,9 +87,24 @@ That user is **uid 1000**, fixed in the image so this instruction can be exact r
 than approximate. It writes three things into `./data`: the database, the Traefik
 configuration, and `acme.json` with your ACME account key.
 
-**Upgrading from a version that ran as root?** Run the same command. Your existing files
-are owned by root, and the container can no longer touch them — it will fail to start
-with a permission error, before it changes anything.
+**Upgrading from a version that ran as root?** The `chown` alone is not enough, and this
+is where it bites: `/guard` and `/contenttargets` are not folders on your disk but Docker
+volumes. They were created while the container was root, so they belong to root, and a
+`chown` on `./data` never touches them. TecGate then starts, fails on the first write and
+restarts in a loop — with messages that point at SQLite, not at ownership.
+
+Do this instead, once:
+
+```sh
+docker compose down
+docker volume rm tecgate_contenttargets tecgate_guardsocket
+sudo chown -R 1000:1000 ./data
+docker compose up -d
+```
+
+**Nothing is lost.** Those two volumes hold the guard's socket and the target table, and
+TecGate writes both again on the next start. (Volume names are prefixed with your project
+directory — `docker volume ls` shows the exact ones if yours differ.)
 
 The second consequence lives in `.env`: `DOCKER_GID`. The container reads
 `/var/run/docker.sock` to list your containers, that socket belongs to a group, and root
