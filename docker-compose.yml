@@ -1,263 +1,114 @@
-# =====================================================================
-# TecGate — three services from one image
-# =====================================================================
+# TecGate — https://github.com/amslertec/tecgate
 #
-#     curl -O   https://raw.githubusercontent.com/amslertec/tecgate/main/docker-compose.yml
-#     curl -o .env https://raw.githubusercontent.com/amslertec/tecgate/main/.env.example
-#     $EDITOR .env          # three values, all explained in that file
+# Copy .env.example to .env, fill in the four values, then:
+#
+#     mkdir -p data && sudo chown -R 1000:1000 data
 #     docker compose up -d
 #
-# There is no `build:` here and no source tree to build from: all three
-# services run the SAME published image and differ only in their
-# entrypoint. `docker compose up -d` pulls it.
-#
-# ---------------------------------------------------------------------
-# The three values that must be filled in — and what happens if they
-# are wrong
-# ---------------------------------------------------------------------
-#
-# They appear below as `${...:?...}`. The question-mark form is a
-# deliberate choice: if the value is missing, `docker compose up` stops
-# with the sentence behind it instead of quietly carrying on with an
-# empty string.
-#
-#   ACME_EMAIL    The mail address of the Let's Encrypt account. Expiry
-#                 warnings go there. Wrong or made up: issuance fails,
-#                 or the warning never arrives.
-#
-#   LAN_ADDRESS   The address at which THIS machine is reachable on your
-#                 own network — not `localhost` and not `127.0.0.1`.
-#                 Traefik runs in a container; from where it stands,
-#                 `localhost` is the container.
-#
-#   CERT_NAMES    The names the interface's own self-signed certificate
-#                 should carry. Usually the same value as LAN_ADDRESS.
-#
-# ---------------------------------------------------------------------
-# A word about the variable names
-# ---------------------------------------------------------------------
-#
-# The container variables are German (`DATEN_VERZEICHNIS`, `ZERT_NAMEN`,
-# `LOKALE_DOCKER_ADRESSE`). That is what the program reads, so that is
-# what stands here. The keys in `.env` are English, because that file is
-# what an operator types. The mapping happens in the `environment:`
-# blocks below and nowhere else.
+# The container runs as uid 1000, which is why the data directory has to
+# belong to it. Details and troubleshooting are in the README.
 
 services:
-
-  # -------------------------------------------------------------------
-  # tecgated — the server: interface, API, and Traefik
-  # -------------------------------------------------------------------
-  #
-  # Traefik does not get a container of its own. tecgated is PID 1, and it
-  # starts, supervises and stops Traefik as a child process; that is why
-  # 80 and 443 are published here and not somewhere else.
+  # The main service: web interface, Traefik, certificates, WAF.
   tecgated:
     image: amslertec/tecgate:${TECGATE_VERSION:-latest}
     container_name: tecgated
     restart: unless-stopped
-
-    # Without this block the Docker log is UNBOUNDED — the daemon's
-    # default keeps every line until the disk is full. 10 MB × 5 files is
-    # a ceiling of 50 MB per service.
+    depends_on:
+      - dockerwacht
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8090"   # web interface
+      - "8091:8091"   # same, over TLS
+    volumes:
+      - ./data:/data
+      - wachtsocket:/wacht
+      - inhaltsziele:/inhaltsziele
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is missing - see .env.example}
+      LOKALE_DOCKER_ADRESSE: ${LAN_ADDRESS:?LAN_ADDRESS is missing - see .env.example}
+      ZERT_NAMEN: ${CERT_NAMES:?CERT_NAMES is missing - see .env.example}
+      DOCKER_SOCKET: /wacht/docker.sock
+      INHALT_ZIEL_VERZEICHNIS: /inhaltsziele
+      INHALT_ZAEHLER_QUELLE: http://inhaltswache:8096/zaehler
+      INHALT_TREFFER_QUELLE: http://inhaltswache:8096/treffer
+      LOG_STUFE: INFO
+      GOMEMLIMIT: 450MiB
+    mem_limit: 1g
+    memswap_limit: 1g
+    security_opt:
+      - no-new-privileges:true
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "5"
 
-    # 1 GiB hard limit; GOMEMLIMIT below sets a soft target of 450 MiB so
-    # the Go collector runs before the hard limit is anywhere near. The
-    # peak comes from Argon2id password hashing, which is memory-hard on
-    # purpose.
-    mem_limit: 1g
-    memswap_limit: 1g
-
-    # No setuid program in the container can gain more privilege than the
-    # process already has. It does NOT make the process unprivileged:
-    # tecgated runs as root because it supervises Traefik, which binds 80
-    # and 443. What this closes is the route through a setuid program
-    # someone puts into the container afterwards.
-    security_opt:
-      - no-new-privileges:true
-
-    ports:
-      # Traefik: the traffic of your proxy hosts.
-      - "80:80"
-      - "443:443"
-      # The TecGate interface. 8090 is plaintext, 8091 is TLS with the
-      # interface's own self-signed certificate.
-      #
-      # **Both are published on every interface of this machine.** If the
-      # machine faces the internet, restrict them — bind them to the LAN
-      # address ("10.0.0.5:8090:8090"), put a firewall in front, or drop
-      # the plaintext line entirely once 8091 works for you.
-      - "8090:8090"
-      - "8091:8091"
-
-    depends_on:
-      - dockerwacht
-
-    volumes:
-      # Everything that must survive: the SQLite database, acme.json with
-      # the private key of the ACME account, issued certificates, the
-      # generated Traefik configuration. **This directory is the backup.**
-      - ./data:/data
-      # The guard's socket. The Docker socket itself is NOT mounted here.
-      - wachtsocket:/wacht
-      # The target table for the content watch: tecgated writes it, the
-      # watch reads it read-only.
-      - inhaltsziele:/inhaltsziele
-
-    environment:
-      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is missing - the mail address of the Let's Encrypt account, see .env.example}
-      LOKALE_DOCKER_ADRESSE: ${LAN_ADDRESS:?LAN_ADDRESS is missing - the address of this machine on your own network, see .env.example}
-      ZERT_NAMEN: ${CERT_NAMES:?CERT_NAMES is missing - usually the same value as LAN_ADDRESS, see .env.example}
-      # The only thing TecGate knows about the guard: a path, not a
-      # Docker socket.
-      DOCKER_SOCKET: /wacht/docker.sock
-      # Where the target table for the content watch is written.
-      INHALT_ZIEL_VERZEICHNIS: /inhaltsziele
-      # tecgated FETCHES from the watch; the watch never pushes. Two
-      # addresses on one listener because the two are collected at
-      # different paces — the counter once a minute, the individual hits
-      # every ten seconds.
-      INHALT_ZAEHLER_QUELLE: http://inhaltswache:8096/zaehler
-      INHALT_TREFFER_QUELLE: http://inhaltswache:8096/treffer
-      # DEBUG | INFO | WARN | ERROR. Note that the log lines themselves
-      # are German — see the README.
-      LOG_STUFE: INFO
-      GOMEMLIMIT: 450MiB
-
-  # -------------------------------------------------------------------
-  # dockerwacht — the guard in front of the Docker socket
-  # -------------------------------------------------------------------
-  #
-  # **The most dangerous container in this set**, because it is the only
-  # one that still sees the machine's Docker socket. Everything below
-  # serves one sentence: whoever takes it over should be able to do as
-  # little as possible with it.
-  #
-  # It passes exactly two calls through — GET /containers/json (at most
-  # with `all`) and GET /info — and drops everything else before it even
-  # looks at the path. Mounting the socket `:ro` protects the file, not
-  # the API: `POST /containers/create` goes straight through a read-only
-  # socket, and whoever can do that owns the host.
+  # Reads the Docker socket so the interface can list your containers.
+  # It passes exactly two read-only routes through and discards the rest,
+  # so that a mounted socket does not mean "root on the host".
   dockerwacht:
     image: amslertec/tecgate:${TECGATE_VERSION:-latest}
     container_name: dockerwacht
     entrypoint: ["/usr/local/bin/dockerwacht"]
     restart: unless-stopped
-
+    network_mode: none
+    read_only: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - wachtsocket:/wacht
+    environment:
+      DOCKER_SOCKET: /var/run/docker.sock
+      WACHT_SOCKET: /wacht/docker.sock
+      LOG_STUFE: INFO
+    # The socket belongs to a group whose number differs per host.
+    # Without it the container page stays empty.
+    group_add:
+      - "${DOCKER_GID:?DOCKER_GID is missing - run: getent group docker | cut -d: -f3}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      disable: true
+    mem_limit: 64m
+    memswap_limit: 64m
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "5"
 
-    # No network at all. It speaks only through the Unix socket on the
-    # shared volume.
-    network_mode: none
-    # Nothing on its filesystem is writable.
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-
-    # The group that owns the Docker socket.
-    #
-    # Since 2026-08-26 the image runs as uid 1000, not root. Root reached
-    # /var/run/docker.sock without help; an ordinary user needs the group
-    # that owns it. Its NUMBER differs from host to host, which is why it
-    # lives in .env rather than here.
-    #
-    # Without it the guard reports "permission denied" on the socket and
-    # the container page stays empty — with nothing else failing.
-    #
-    #     DOCKER_GID=$(getent group docker | cut -d: -f3)
-    group_add:
-      - "${DOCKER_GID:?DOCKER_GID is missing - the numeric id of the host's docker group, see .env.example}"
-
-    # The image's health check belongs to tecgated and asks for a path
-    # this service does not serve. Left on, it would report "unhealthy"
-    # forever while working perfectly.
-    healthcheck:
-      disable: true
-
-    mem_limit: 64m
-    memswap_limit: 64m
-
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - wachtsocket:/wacht
-
-    environment:
-      DOCKER_SOCKET: /var/run/docker.sock
-      WACHT_SOCKET: /wacht/docker.sock
-      LOG_STUFE: INFO
-
-  # -------------------------------------------------------------------
-  # inhaltswache — Coraza with the OWASP Core Rule Set
-  # -------------------------------------------------------------------
-  #
-  # **The only one of the three that Traefik talks to.** For a host with
-  # content inspection switched on, Traefik's service points here instead
-  # of at the host's target, and the watch forwards what passes. The rest
-  # of the WAF — country, reputation, network, rate, bot — hangs off the
-  # router and still runs before this, seeing the real visitor.
-  #
-  # **A host that uses it depends on it.** If this service is down, that
-  # host answers 502. It does not fall open. See the README.
+  # Coraza with the OWASP Core Rule Set. Only used by hosts where you
+  # switch content inspection on; it listens on no published port.
   inhaltswache:
     image: amslertec/tecgate:${TECGATE_VERSION:-latest}
     container_name: inhaltswache
     entrypoint: ["/usr/local/bin/inhaltswache"]
     restart: unless-stopped
-
+    read_only: true
+    volumes:
+      - inhaltsziele:/inhaltsziele:ro
+    environment:
+      INHALT_ZIELTABELLE: /inhaltsziele/zieltabelle.json
+      INHALT_ADRESSE: ":8095"
+      INHALT_ZAEHLER_ADRESSE: ":8096"
+      LOG_STUFE: INFO
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      disable: true
+    mem_limit: 512m
+    memswap_limit: 512m
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "5"
 
-    # Nothing on the root filesystem is writable. The rule set sits inside
-    # the binary, the target table is mounted read-only, and the scratch
-    # space Coraza needs is /dev/shm, which Docker provides regardless.
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-
-    # Same reason as at the guard: the image's health check is tecgated's.
-    healthcheck:
-      disable: true
-
-    # 512 MiB. The body inspection depth is 128 KiB PER CONCURRENT
-    # REQUEST by default, and that is what this ceiling is for.
-    mem_limit: 512m
-    memswap_limit: 512m
-
-    # **No published port on purpose.** It has a network — Traefik has to
-    # reach it — but only the internal one. Whoever reached the watch
-    # directly would be talking to the thing that decides, instead of
-    # through it.
-    volumes:
-      - inhaltsziele:/inhaltsziele:ro
-
-    environment:
-      INHALT_ZIELTABELLE: /inhaltsziele/zieltabelle.json
-      # Where Traefik reaches it.
-      INHALT_ADRESSE: ":8095"
-      # The second listener, from which tecgated fetches hits and counts.
-      INHALT_ZAEHLER_ADRESSE: ":8096"
-      LOG_STUFE: INFO
-
 volumes:
-  # The guard's socket — shared by tecgated and dockerwacht.
   wachtsocket:
-  # The target table — tecgated writes, inhaltswache reads (read-only).
-  # It holds exactly one file; anything else in there means something is
-  # wrong.
   inhaltsziele:
