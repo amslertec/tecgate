@@ -61,7 +61,7 @@ Plus an **overview** page that summarises all of it, **users** with two roles
 
 ## Quick start
 
-Three files, three values, one command.
+Three files, four values, one command.
 
 ```sh
 mkdir tecgate && cd tecgate
@@ -69,18 +69,42 @@ mkdir tecgate && cd tecgate
 curl -O    https://raw.githubusercontent.com/amslertec/tecgate/main/docker-compose.yml
 curl -o .env https://raw.githubusercontent.com/amslertec/tecgate/main/.env.example
 
+# The container runs as an unprivileged user, so the data directory has
+# to belong to it — see "Why the chown" below.
+mkdir -p data && sudo chown -R 1000:1000 data
+
 $EDITOR .env
 docker compose up -d
 ```
+
+### Why the `chown`
+
+TecGate does not run as root inside its container. That is the right way round — code
+running in the container is not root in the container either — but it has a price, and
+this is it: the directory the container writes to has to belong to the user it runs as.
+
+That user is **uid 1000**, fixed in the image so this instruction can be exact rather
+than approximate. It writes three things into `./data`: the database, the Traefik
+configuration, and `acme.json` with your ACME account key.
+
+**Upgrading from a version that ran as root?** Run the same command. Your existing files
+are owned by root, and the container can no longer touch them — it will fail to start
+with a permission error, before it changes anything.
+
+The second consequence lives in `.env`: `DOCKER_GID`. The container reads
+`/var/run/docker.sock` to list your containers, that socket belongs to a group, and root
+got in without being told. Find the number with
+`getent group docker | cut -d: -f3`. Get it wrong and nothing crashes — the container
+page simply stays empty.
 
 **The second `curl` renames the file on the way down.** In this repository the template is
 called `.env.example`; `docker compose` only reads a file called `.env`. The `-o` does the
 rename — without it you would have a template sitting next to a stack that ignores it.
 
-### The three values you must change first
+### The four values you must change first
 
 `.env` ships with placeholders from ranges reserved for documentation. **They work
-nowhere, on purpose:** a template that happens to start never gets filled in. All three are
+nowhere, on purpose:** a template that happens to start never gets filled in. All four are
 declared in `docker-compose.yml` as `${...:?...}`, so a missing one stops
 `docker compose up` with a sentence naming it instead of running on with an empty string.
 
@@ -89,6 +113,7 @@ declared in `docker-compose.yml` as `${...:?...}`, so a missing one stops
 | `ACME_EMAIL` | The mail address of your Let's Encrypt account. Expiry warnings go there, and Let's Encrypt does not check that the address exists |
 | `LAN_ADDRESS` | The address at which **this machine** is reachable on your own network. **Not** `localhost`, **not** `127.0.0.1` — Traefik runs in a container, and from where it stands `localhost` is the container |
 | `CERT_NAMES` | The names the interface's own certificate should carry. Usually the same value as `LAN_ADDRESS`; separate several with commas |
+| `DOCKER_GID` | The numeric id of your host's `docker` group — `getent group docker \| cut -d: -f3`. Needed because the container is not root and cannot read the Docker socket without it |
 
 ### Then open the interface
 

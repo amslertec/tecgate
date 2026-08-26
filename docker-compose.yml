@@ -165,6 +165,20 @@ services:
     security_opt:
       - no-new-privileges:true
 
+    # The group that owns the Docker socket.
+    #
+    # Since 2026-08-26 the image runs as uid 1000, not root. Root reached
+    # /var/run/docker.sock without help; an ordinary user needs the group
+    # that owns it. Its NUMBER differs from host to host, which is why it
+    # lives in .env rather than here.
+    #
+    # Without it the guard reports "permission denied" on the socket and
+    # the container page stays empty — with nothing else failing.
+    #
+    #     DOCKER_GID=$(getent group docker | cut -d: -f3)
+    group_add:
+      - "${DOCKER_GID:?DOCKER_GID is missing - the numeric id of the host's docker group, see .env.example}"
+
     # The image's health check belongs to tecgated and asks for a path
     # this service does not serve. Left on, it would report "unhealthy"
     # forever while working perfectly.
