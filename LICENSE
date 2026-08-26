@@ -1,0 +1,67 @@
+MIT License
+
+Copyright (c) 2026 amslertec
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------
+What the licence above covers in THIS repository
+--------------------------------------------------------------------------
+
+This repository contains no source code. For the purposes of the licence
+above, "the Software" is what this repository actually holds: the
+documentation (README.md, DOCKERHUB.md), the Compose file
+(docker-compose.yml) and the environment template (.env.example). Copy
+them, change them, use them in your own setup, ship them with your own
+work -- MIT, nothing further asked.
+
+--------------------------------------------------------------------------
+What it does NOT cover: the container image
+--------------------------------------------------------------------------
+
+The TecGate image (docker.io/amslertec/tecgate) is distributed from Docker
+Hub, not from this repository, and the grant above says nothing about it.
+Its terms travel inside it: the image carries its licence texts at
+/usr/share/licenses/tecgate/LICENSE and
+/usr/share/licenses/owasp-crs/LICENSE, and those are the ones that apply
+to the software it runs -- among them the Apache License 2.0 of the
+bundled OWASP Core Rule Set, whose obligations MIT does not lift.
+
+Two things follow, and neither is a formality:
+
+  - Reading or copying this repository grants no right in the image.
+  - The image is supplied with no warranty of any kind either. This is
+    one installation's tooling, published in case it is useful, not a
+    product with support behind it.
+
+--------------------------------------------------------------------------
+What it does NOT cover: name, mark and wordmark
+--------------------------------------------------------------------------
+
+The licence above does not cover the name "TecGate", the mark, or the
+wordmark (marke/logo-wortmarke-hell.svg, marke/logo-wortmarke-dunkel.svg,
+and the same mark as it appears inside the interface).
+
+A wordmark is a trademark, not software: released under MIT, anyone could
+put it on a product of their own. Passing it on unchanged in order to
+refer to TecGate is permitted; using it as your own mark, or for a derived
+product, is not. The terms in full are in TRADEMARK.md.
+
+This does not restrict anything you may do with TecGate -- it separates
+the work from the attribution.
