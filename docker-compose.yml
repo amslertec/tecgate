@@ -14,15 +14,32 @@ services:
     image: amslertec/tecgate:${TECGATE_VERSION:-latest}
     container_name: tecgated
     restart: unless-stopped
+    # 40 s before SIGKILL (audit D-06): Traefik's graceTimeOut is 30 s, and
+    # the flushes of WAF counters, bundles and metrics run after it.
+    # Docker's default of 10 s cut them off.
+    stop_grace_period: 40s
     depends_on:
       - dockerguard
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp" # HTTP/3 - used once "Offer HTTP/3" is switched on
       - "8090:8090"   # web interface
       - "8091:8091"   # same, over TLS
     volumes:
       - ./data:/data
+      # Where backups are written. This line is the ONLY place the target
+      # is set - the interface has no field for it, and deliberately so:
+      # the container sees exactly the mounts listed here, and a text
+      # field would accept a path that does not exist inside it.
+      #
+      # Put whatever you want on the left. A path on a SECOND disk or an
+      # NFS mount is the sensible choice - a backup next to the original
+      # helps against a wrong click, not against a failing disk.
+      #
+      # Remove the line and TecGate writes to ./data/sicherungen instead
+      # and says so in the interface. It backs up either way.
+      - ./backups:/backup
       - guardsocket:/guard
       - contenttargets:/contenttargets
     environment:
@@ -39,6 +56,14 @@ services:
     memswap_limit: 1g
     security_opt:
       - no-new-privileges:true
+    # No capabilities; NET_BIND_SERVICE is not needed for 80/443 because
+    # unprivileged ports start at 80 in this container (sysctls below).
+    # Under no-new-privileges a file capability on the binary would be
+    # ignored, so this sysctl is the mechanism that lets uid 1000 bind them.
+    cap_drop:
+      - ALL
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 80
     logging:
       driver: json-file
       options:
@@ -70,8 +95,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      disable: true
+    # The image's healthcheck detects its role via /proc/1/comm and, for
+    # the guard, checks that its Unix socket is bound (gesundheit.sh).
     mem_limit: 64m
     memswap_limit: 64m
     logging:
@@ -99,8 +124,9 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      disable: true
+    # Same healthcheck as the guard above. For contentguard it asks the
+    # counter endpoint on 8096, not the forwarder on 8095 - a request
+    # there would reach a backend and fail whenever a host is misconfigured.
     mem_limit: 512m
     memswap_limit: 512m
     logging:

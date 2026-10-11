@@ -29,7 +29,7 @@ Two sentences that are cheap to read now and expensive to discover in production
 explained in full under [Limits](#limits-and-caveats), which is the section of this
 document worth your time.
 
-1. **Content inspection fails closed.** If the `inhaltswache` container dies, every host
+1. **Content inspection fails closed.** If the `contentguard` container dies, every host
    that has content inspection enabled answers **502** — it is dead, not unfiltered. That
    is deliberate, it applies in detection mode too, and it means an enabled host depends on
    that container being up.
@@ -158,7 +158,7 @@ and gets a Let's Encrypt certificate.
 
 - **A server with Docker** and the Compose plugin (`docker compose`, v2). Nothing else is
   installed on the host.
-- **Ports 80 and 443 free.** Traefik binds them. If something else already listens there —
+- **Ports 80 and 443 free** (443 as TCP, and as UDP if you want HTTP/3). Traefik binds them. If something else already listens there —
   another reverse proxy, Apache, a stray nginx — TecGate will not start.
 - **A writable directory** for `./data`. It is created on first start.
 - **A domain whose DNS you control**, if you want certificates from Let's Encrypt. HTTP-01
@@ -189,19 +189,19 @@ it to the `environment:` block of the `tecgated` service.
 | `DATEN_VERZEICHNIS` | `/data` *(image)* | Database, `acme.json`, certificates, generated Traefik configuration |
 | `ADRESSE` | `:8090` *(image)* | Plaintext listener of the interface |
 | `ADRESSE_TLS` | `:8091` *(program)* | TLS listener with the self-signed certificate |
-| `DOCKER_SOCKET` | `/wacht/docker.sock` | Path to the guard's socket — **not** the Docker socket |
+| `DOCKER_SOCKET` | `/guard/docker.sock` | Path to the guard's socket — **not** the Docker socket |
 | `TRAEFIK_PFAD` | `/usr/local/bin/traefik` *(image)* | The Traefik binary inside the image |
 | `LOG_STUFE` | `INFO` | `DEBUG` · `INFO` · `WARN` · `ERROR` |
 | `LOG_FORM` | `lesbar` *(program)* | `lesbar` for human-readable lines, anything else for JSON |
 | `GOMEMLIMIT` | `450MiB` | Soft target for the Go collector, below the 1 GiB hard limit |
-| `INHALT_ZIEL_VERZEICHNIS` | `/inhaltsziele` | Where the target table for the content watch is written |
-| `INHALT_ZAEHLER_QUELLE` | `http://inhaltswache:8096/zaehler` | Where TecGate fetches the content-inspection counters |
-| `INHALT_TREFFER_QUELLE` | `http://inhaltswache:8096/treffer` | Where it fetches the individual hits |
+| `INHALT_ZIEL_VERZEICHNIS` | `/contenttargets` | Where the target table for the content watch is written |
+| `INHALT_ZAEHLER_QUELLE` | `http://contentguard:8096/zaehler` | Where TecGate fetches the content-inspection counters |
+| `INHALT_TREFFER_QUELLE` | `http://contentguard:8096/treffer` | Where it fetches the individual hits |
 | `WAF_AUS` | unset *(program)* | Exactly `1` disables the whole WAF. A kill switch from the environment, not from the database — for the case where a rule you cannot reach has locked you out |
 
-The `inhaltswache` service reads `INHALT_ZIELTABELLE`, `INHALT_ADRESSE` (`:8095`, where
+The `contentguard` service reads `INHALT_ZIELTABELLE`, `INHALT_ADRESSE` (`:8095`, where
 Traefik reaches it) and `INHALT_ZAEHLER_ADRESSE` (`:8096`, where TecGate fetches from).
-`dockerwacht` reads `DOCKER_SOCKET` and `WACHT_SOCKET`.
+`dockerguard` reads `DOCKER_SOCKET` and `WACHT_SOCKET`.
 
 `TECGATE_VERSION` in `.env` decides which image tag the stack runs. It is commented out and
 defaults to `latest`; pin it if you would rather choose yourself when the software changes.
@@ -214,9 +214,9 @@ All three run the **same image** and differ only in their entrypoint.
 
 | Service | What it is | Network | Ports |
 |---|---|---|---|
-| `tecgated` | The server: interface, API, and Traefik as its child process | default | 80, 443, 8090, 8091 |
-| `dockerwacht` | The guard in front of the Docker socket | **none** | none |
-| `inhaltswache` | Coraza with the OWASP Core Rule Set | default | none published |
+| `tecgated` | The server: interface, API, and Traefik as its child process | default | 80, 443 (TCP and UDP), 8090, 8091 |
+| `dockerguard` | The guard in front of the Docker socket | **none** | none |
+| `contentguard` | Coraza with the OWASP Core Rule Set | default | none published |
 
 **Why the guard exists.** Mounting the Docker socket read-only protects the file, not the
 API: `POST /containers/create` goes straight through a `:ro` socket, and whoever can do
@@ -341,7 +341,7 @@ skipped and counted, never applied — that floor is not a setting.
 ### Content inspection
 
 **[Coraza](https://coraza.io/) with the OWASP Core Rule Set 4.29.0**, at paranoia level 1
-with an anomaly threshold of 5, running in the `inhaltswache` container. For a host that has
+with an anomaly threshold of 5, running in the `contentguard` container. For a host that has
 it enabled, Traefik's service points at the watch instead of at the host's target.
 
 - It inspects the **request**: method, path, query string, headers — and the **beginning of
@@ -411,8 +411,8 @@ edit it while the stack is running.** Two writers destroy it.
 
 ```sh
 docker compose logs -f tecgated
-docker compose logs -f inhaltswache
-docker compose logs -f dockerwacht
+docker compose logs -f contentguard
+docker compose logs -f dockerguard
 ```
 
 Set `LOG_STUFE: DEBUG` in `docker-compose.yml` for more, `LOG_FORM` to anything other than
@@ -429,7 +429,7 @@ rejected Let's Encrypt certificate is a Traefik error, and it used to go past un
 |---|---|
 | `docker compose up` stops naming a variable | The value is missing from `.env`. That is the `${...:?...}` form doing its job |
 | Nothing on 8090 | `docker compose ps` — did `tecgated` start? Is something else on 80 or 443? |
-| A host answers **502** | If it has content inspection enabled, check `inhaltswache` first. That is what failing closed looks like |
+| A host answers **502** | If it has content inspection enabled, check `contentguard` first. That is what failing closed looks like |
 | A host answers **503** with a page saying so | The host is switched off in the interface |
 | A certificate never arrives | *Certificates* shows the reason. HTTP-01 needs port 80 reachable from the internet and the domain pointing here; DNS-01 needs a Hetzner token with write access |
 | The browser warns about the interface certificate | It is self-signed. Add the name you actually use to `CERT_NAMES`, or give the interface a domain under *Settings* |
@@ -443,7 +443,7 @@ The honest section. Read it before you decide to run this.
 
 ### The one that will cost you an outage
 
-**Content inspection fails closed.** If the `inhaltswache` container is down — stopped,
+**Content inspection fails closed.** If the `contentguard` container is down — stopped,
 crashed, out of memory, or unable to load its rule set — every host with content inspection
 enabled answers **502**. It is dead, not unfiltered.
 
@@ -504,8 +504,9 @@ than accepting the setting and quietly ignoring it:
   8091 works for you.
 - **The setup wizard is open until it is finished.** Anyone who can reach port 8090 before
   you complete it can create the first administrator account.
-- **`tecgated` runs as root** and it is PID 1: it supervises Traefik, which binds 80 and 443.
-  `no-new-privileges` is set, but it takes nothing away from root that root already has.
+- **`tecgated` runs as uid 1000 without capabilities** and is PID 1: it supervises Traefik,
+  which binds 80 and 443 through `net.ipv4.ip_unprivileged_port_start: 80` in the compose file.
+  The data directory and named volumes must belong to uid 1000.
 - **The Docker socket is still on the machine.** The guard narrows what TecGate can ask for
   to two read-only calls; it does not remove the socket. A third call is only ever added
   together with the feature that needs it.

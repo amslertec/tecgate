@@ -41,9 +41,9 @@ their configuration.
 
 | Service | What it is |
 |---|---|
-| `tecgated` | The server: interface, API, and Traefik as its child process. Ports 80, 443, 8090, 8091 |
-| `dockerwacht` | A guard in front of the Docker socket. No network, read-only, all capabilities dropped, exactly two read calls allowed through |
-| `inhaltswache` | Coraza with the OWASP CRS. No published port |
+| `tecgated` | The server: interface, API, and Traefik as its child process. Ports 80, 443 (TCP and UDP for HTTP/3), 8090, 8091 |
+| `dockerguard` | A guard in front of the Docker socket. No network, read-only, all capabilities dropped, exactly two read calls allowed through |
+| `contentguard` | Coraza with the OWASP CRS. No published port |
 
 Everything that must survive lives in `./data` — the database, `acme.json`, the
 certificates. That directory is your backup.
@@ -55,7 +55,7 @@ certificates. That directory is your backup.
 
 ## Two things worth knowing before you start
 
-- **Content inspection fails closed.** If `inhaltswache` is down, every host with content
+- **Content inspection fails closed.** If `contentguard` is down, every host with content
   inspection enabled answers **502** — dead, not unfiltered. That applies in detection mode
   too, and only to hosts where you switched it on.
 - **DNS management works with Hetzner and nothing else**, and the program's log lines are
