@@ -1,6 +1,6 @@
 # TecGate — https://github.com/amslertec/tecgate
 #
-# Copy .env.example to .env, fill in the four values, then:
+# Copy .env.example to .env, fill in the values, then:
 #
 #     mkdir -p data && sudo chown -R 1000:1000 data
 #     docker compose up -d
@@ -18,8 +18,6 @@ services:
     # the flushes of WAF counters, bundles and metrics run after it.
     # Docker's default of 10 s cut them off.
     stop_grace_period: 40s
-    depends_on:
-      - dockerguard
     ports:
       - "80:80"
       - "443:443"
@@ -40,13 +38,10 @@ services:
       # Remove the line and TecGate writes to ./data/sicherungen instead
       # and says so in the interface. It backs up either way.
       - ./backups:/backup
-      - guardsocket:/guard
       - contenttargets:/contenttargets
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is missing - see .env.example}
-      LOKALE_DOCKER_ADRESSE: ${LAN_ADDRESS:?LAN_ADDRESS is missing - see .env.example}
       ZERT_NAMEN: ${CERT_NAMES:?CERT_NAMES is missing - see .env.example}
-      DOCKER_SOCKET: /guard/docker.sock
       INHALT_ZIEL_VERZEICHNIS: /contenttargets
       INHALT_ZAEHLER_QUELLE: http://contentguard:8096/zaehler
       INHALT_TREFFER_QUELLE: http://contentguard:8096/treffer
@@ -64,41 +59,6 @@ services:
       - ALL
     sysctls:
       net.ipv4.ip_unprivileged_port_start: 80
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-
-  # Reads the Docker socket so the interface can list your containers.
-  # It passes exactly two read-only routes through and discards the rest,
-  # so that a mounted socket does not mean "root on the host".
-  dockerguard:
-    image: amslertec/tecgate:${TECGATE_VERSION:-latest}
-    container_name: dockerguard
-    entrypoint: ["/usr/local/bin/dockerguard"]
-    restart: unless-stopped
-    network_mode: none
-    read_only: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - guardsocket:/guard
-    environment:
-      DOCKER_SOCKET: /var/run/docker.sock
-      WACHT_SOCKET: /guard/docker.sock
-      LOG_STUFE: INFO
-    # The socket belongs to a group whose number differs per host.
-    # Without it the container page stays empty.
-    group_add:
-      - "${DOCKER_GID:?DOCKER_GID is missing - run: getent group docker | cut -d: -f3}"
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    # The image's healthcheck detects its role via /proc/1/comm and, for
-    # the guard, checks that its Unix socket is bound (gesundheit.sh).
-    mem_limit: 64m
-    memswap_limit: 64m
     logging:
       driver: json-file
       options:
@@ -124,7 +84,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    # Same healthcheck as the guard above. For contentguard it asks the
+    # The image's healthcheck detects its role via /proc/1/comm (gesundheit.sh).
+    # For contentguard it asks the
     # counter endpoint on 8096, not the forwarder on 8095 - a request
     # there would reach a backend and fail whenever a host is misconfigured.
     mem_limit: 512m
@@ -136,5 +97,4 @@ services:
         max-file: "5"
 
 volumes:
-  guardsocket:
   contenttargets:

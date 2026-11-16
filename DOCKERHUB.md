@@ -3,7 +3,7 @@
 **A web interface for [Traefik](https://traefik.io/): enter a domain and a target, and
 TecGate writes the reverse-proxy configuration, obtains the certificate, keeps the DNS
 record straight and filters the traffic — proxy hosts, Let's Encrypt, Hetzner DNS,
-containers, a WAF with bot challenges, and request-body inspection with
+a WAF with bot challenges, and request-body inspection with
 [Coraza](https://coraza.io/) and the OWASP Core Rule Set.**
 
 It runs Traefik itself, as a child process, and stores everything in one SQLite file. No
@@ -21,11 +21,11 @@ mkdir tecgate && cd tecgate
 curl -O      https://raw.githubusercontent.com/amslertec/tecgate/main/docker-compose.yml
 curl -o .env https://raw.githubusercontent.com/amslertec/tecgate/main/.env.example
 
-$EDITOR .env      # three values: ACME_EMAIL, LAN_ADDRESS, CERT_NAMES
+$EDITOR .env      # two values: ACME_EMAIL, CERT_NAMES
 docker compose up -d
 ```
 
-Then open `http://<LAN_ADDRESS>:8090` and finish the setup wizard. It creates the first
+Then open `http://<this machine's address>:8090` and finish the setup wizard. It creates the first
 administrator account — there is no default user and no default password.
 
 **Finish it promptly:** until it is complete, anyone who can reach port 8090 can create that
@@ -35,14 +35,13 @@ The second `curl` renames the file as it downloads. `docker compose` only reads 
 called `.env`, and the template is called `.env.example` so that nobody runs the template as
 their configuration.
 
-## Three services, one image
+## Two services, one image
 
-`docker-compose.yml` starts all three from this image; they differ only in their entrypoint.
+`docker-compose.yml` starts both from this image; they differ only in their entrypoint.
 
 | Service | What it is |
 |---|---|
 | `tecgated` | The server: interface, API, and Traefik as its child process. Ports 80, 443 (TCP and UDP for HTTP/3), 8090, 8091 |
-| `dockerguard` | A guard in front of the Docker socket. No network, read-only, all capabilities dropped, exactly two read calls allowed through |
 | `contentguard` | Coraza with the OWASP CRS. No published port |
 
 Everything that must survive lives in `./data` — the database, `acme.json`, the

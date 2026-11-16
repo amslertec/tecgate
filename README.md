@@ -45,7 +45,6 @@ document worth your time.
 | **Proxy hosts** | Domain → target. TLS, several targets with load balancing and sticky sessions, health checks, "internal networks only", switch a host off |
 | **Certificates** | Let's Encrypt via HTTP-01 or DNS-01, certificates you upload yourself, and self-signed ones TecGate issues for its own interface |
 | **DNS** | Records at Hetzner DNS: read them, write them, and see which of your domains actually point at this machine |
-| **Containers** | What runs on this Docker host, and on remote hosts through a small agent |
 | **Rules** | The WAF: network, country, rate, path, reputation, bot challenge, internal-only, content inspection |
 | **Requests** | What got through, what did not, and why — grouped, searchable, with the real visitor address |
 | **Bans** | Your own bans and the ones the rules produced, with escalating durations |
@@ -61,7 +60,7 @@ Plus an **overview** page that summarises all of it, **users** with two roles
 
 ## Quick start
 
-Three files, four values, one command.
+Three files, two values, one command.
 
 ```sh
 mkdir tecgate && cd tecgate
@@ -88,52 +87,44 @@ than approximate. It writes three things into `./data`: the database, the Traefi
 configuration, and `acme.json` with your ACME account key.
 
 **Upgrading from a version that ran as root?** The `chown` alone is not enough, and this
-is where it bites: `/guard` and `/contenttargets` are not folders on your disk but Docker
-volumes. They were created while the container was root, so they belong to root, and a
-`chown` on `./data` never touches them. TecGate then starts, fails on the first write and
+is where it bites: `/contenttargets` is not a folder on your disk but a Docker
+volume. It was created while the container was root, so it belongs to root, and a
+`chown` on `./data` never touches it. TecGate then starts, fails on the first write and
 restarts in a loop — with messages that point at SQLite, not at ownership.
 
 Do this instead, once:
 
 ```sh
 docker compose down
-docker volume rm tecgate_contenttargets tecgate_guardsocket
+docker volume rm tecgate_contenttargets
 sudo chown -R 1000:1000 ./data
 docker compose up -d
 ```
 
-**Nothing is lost.** Those two volumes hold the guard's socket and the target table, and
-TecGate writes both again on the next start. (Volume names are prefixed with your project
+**Nothing is lost.** That volume holds the target table, and TecGate writes it again on
+the next start. (Volume names are prefixed with your project
 directory — `docker volume ls` shows the exact ones if yours differ.)
-
-The second consequence lives in `.env`: `DOCKER_GID`. The container reads
-`/var/run/docker.sock` to list your containers, that socket belongs to a group, and root
-got in without being told. Find the number with
-`getent group docker | cut -d: -f3`. Get it wrong and nothing crashes — the container
-page simply stays empty.
 
 **The second `curl` renames the file on the way down.** In this repository the template is
 called `.env.example`; `docker compose` only reads a file called `.env`. The `-o` does the
 rename — without it you would have a template sitting next to a stack that ignores it.
 
-### The four values you must change first
+### The two values you must change first
 
 `.env` ships with placeholders from ranges reserved for documentation. **They work
-nowhere, on purpose:** a template that happens to start never gets filled in. All four are
+nowhere, on purpose:** a template that happens to start never gets filled in. Both are
 declared in `docker-compose.yml` as `${...:?...}`, so a missing one stops
 `docker compose up` with a sentence naming it instead of running on with an empty string.
 
 | In `.env` | What it must become |
 |---|---|
 | `ACME_EMAIL` | The mail address of your Let's Encrypt account. Expiry warnings go there, and Let's Encrypt does not check that the address exists |
-| `LAN_ADDRESS` | The address at which **this machine** is reachable on your own network. **Not** `localhost`, **not** `127.0.0.1` — Traefik runs in a container, and from where it stands `localhost` is the container |
-| `CERT_NAMES` | The names the interface's own certificate should carry. Usually the same value as `LAN_ADDRESS`; separate several with commas |
-| `DOCKER_GID` | The numeric id of your host's `docker` group — `getent group docker \| cut -d: -f3`. Needed because the container is not root and cannot read the Docker socket without it |
+| `CERT_NAMES` | The names the interface's own certificate should carry. Usually the address at which **this machine** is reachable on your own network; separate several with commas |
 
 ### Then open the interface
 
 ```
-http://<LAN_ADDRESS>:8090
+http://<this machine's address>:8090
 ```
 
 The first visit lands in the setup wizard. It creates the first administrator account —
@@ -146,7 +137,7 @@ under *Settings*.
 > The wizard says so on its first screen. It is the reason to do this on a machine that is
 > not yet exposed, or behind a firewall.
 
-Once it is done, `https://<LAN_ADDRESS>:8091` serves the same interface over TLS, with the
+Once it is done, `https://<this machine's address>:8091` serves the same interface over TLS, with the
 self-signed certificate whose names you set in `CERT_NAMES`. Your browser will warn about
 it — that is what self-signed means. If you would rather have a real certificate for the
 interface, give it a domain under *Settings*; it then becomes a proxy host like any other
@@ -166,15 +157,14 @@ and gets a Let's Encrypt certificate.
   from the internet.
 - **A Hetzner API token**, and only if you want DNS-01 challenges or DNS record management.
   Optional, and Hetzner is the only provider — see [Limits](#limits-and-caveats).
-- **About 1.6 GiB of RAM** for the three containers at their ceilings (1 GiB + 512 MiB +
-  64 MiB). In practice they sit far below that; the ceilings exist so that a burst cannot
+- **About 1.5 GiB of RAM** for the two containers at their ceilings (1 GiB + 512 MiB). In practice they sit far below that; the ceilings exist so that a burst cannot
   take the machine with it.
 
 ---
 
 ## The settings in `docker-compose.yml`
 
-These are the variables the program itself reads, so their names are German. Three of them
+These are the variables the program itself reads, so their names are German. Two of them
 get their value from `.env`; the rest have working defaults and you will rarely touch them.
 
 **Not every row is in `docker-compose.yml`.** Those marked *(image)* come from the image's
@@ -184,12 +174,10 @@ it to the `environment:` block of the `tecgated` service.
 | Variable | Default | What it does |
 |---|---|---|
 | `ACME_EMAIL` | from `.env` | Contact address of the Let's Encrypt account |
-| `LOKALE_DOCKER_ADRESSE` | from `.env` (`LAN_ADDRESS`) | The address at which Traefik reaches this machine's containers |
 | `ZERT_NAMEN` | from `.env` (`CERT_NAMES`) | Extra names for the interface's self-signed certificate, comma-separated |
 | `DATEN_VERZEICHNIS` | `/data` *(image)* | Database, `acme.json`, certificates, generated Traefik configuration |
 | `ADRESSE` | `:8090` *(image)* | Plaintext listener of the interface |
 | `ADRESSE_TLS` | `:8091` *(program)* | TLS listener with the self-signed certificate |
-| `DOCKER_SOCKET` | `/guard/docker.sock` | Path to the guard's socket — **not** the Docker socket |
 | `TRAEFIK_PFAD` | `/usr/local/bin/traefik` *(image)* | The Traefik binary inside the image |
 | `LOG_STUFE` | `INFO` | `DEBUG` · `INFO` · `WARN` · `ERROR` |
 | `LOG_FORM` | `lesbar` *(program)* | `lesbar` for human-readable lines, anything else for JSON |
@@ -201,30 +189,24 @@ it to the `environment:` block of the `tecgated` service.
 
 The `contentguard` service reads `INHALT_ZIELTABELLE`, `INHALT_ADRESSE` (`:8095`, where
 Traefik reaches it) and `INHALT_ZAEHLER_ADRESSE` (`:8096`, where TecGate fetches from).
-`dockerguard` reads `DOCKER_SOCKET` and `WACHT_SOCKET`.
 
 `TECGATE_VERSION` in `.env` decides which image tag the stack runs. It is commented out and
 defaults to `latest`; pin it if you would rather choose yourself when the software changes.
 
 ---
 
-## What the three containers are
+## What the two containers are
 
-All three run the **same image** and differ only in their entrypoint.
+Both run the **same image** and differ only in their entrypoint.
 
 | Service | What it is | Network | Ports |
 |---|---|---|---|
 | `tecgated` | The server: interface, API, and Traefik as its child process | default | 80, 443 (TCP and UDP), 8090, 8091 |
-| `dockerguard` | The guard in front of the Docker socket | **none** | none |
 | `contentguard` | Coraza with the OWASP Core Rule Set | default | none published |
 
-**Why the guard exists.** Mounting the Docker socket read-only protects the file, not the
-API: `POST /containers/create` goes straight through a `:ro` socket, and whoever can do
-that owns the host. So the socket is mounted in exactly one container, which has no network
-at all, a read-only filesystem, all capabilities dropped, and passes exactly two calls
-through: `GET /containers/json` and `GET /info`. `tecgated` reaches it through a Unix
-socket on a shared volume. The old defence — "TecGate has no write path" — was a promise
-made by a program; this one is made by the kernel.
+**No Docker access.** No container mounts the Docker socket, and TecGate never talks to
+the Docker daemon. A proxy host points at an address and a port; what runs behind it is
+your business.
 
 ---
 
@@ -261,14 +243,6 @@ your domains actually resolve to this machine. Two switches, both **off** by def
 following your public address when it changes, and rewriting your own records to match. They
 are separate on purpose — wanting to know that your address changed and wanting your DNS
 rewritten are two different wishes.
-
-### Containers
-
-What runs on this Docker host, grouped by Compose stack: image, state, the address a proxy
-host could point at, and whether one already does. **Remote hosts** report through a small
-agent (`tecgate-agent`) that pushes over HTTPS; you
-add a host in the interface, it issues a token once, and you run one command on the remote
-machine. The token is shown exactly once and only its hash is stored.
 
 ### Rules — the WAF
 
@@ -387,6 +361,46 @@ restarting.
 If you pinned `TECGATE_VERSION`, `docker compose pull` does nothing until you edit that
 line. That is the point of pinning.
 
+### Upgrading from a version with the container page
+
+Earlier versions had a **Containers** page and a second container, `dockerguard`, that
+read the Docker socket for it. That page is gone, and with it TecGate's Docker access:
+no container mounts the Docker socket any more. Your old `docker-compose.yml` still
+starts `dockerguard`, and it still has the `guardsocket` volume. Neither is needed; remove
+both like this:
+
+1. **Back up `./data`** (below) — as before every update.
+2. Stop the old guard and remove its container:
+
+   ```sh
+   docker compose stop dockerguard
+   docker compose rm -f dockerguard
+   ```
+
+3. Edit `docker-compose.yml` — or replace it with the current one from this repository
+   and carry your own changes over:
+   - delete the whole `dockerguard:` service;
+   - in the `tecgated:` service, delete the `depends_on:` entry `- dockerguard` (and the
+     `depends_on:` line itself if nothing else is left under it), the volume line
+     `- guardsocket:/guard` and the environment line `DOCKER_SOCKET: /guard/docker.sock`;
+   - under the top-level `volumes:`, delete `guardsocket:`.
+4. Remove `DOCKER_GID` and `LAN_ADDRESS` from `.env` — neither is read any more.
+5. Start the new version and remove the orphaned volume:
+
+   ```sh
+   docker compose pull
+   docker compose up -d --remove-orphans
+   docker volume rm tecgate_guardsocket
+   ```
+
+   The volume name carries your project's prefix — `docker volume ls | grep guardsocket`
+   shows it if your folder is not called `tecgate`. The volume only ever held the guard's
+   socket; **nothing is lost** by removing it.
+
+Docker hosts and remote agents you had added are no longer shown or contacted. If you
+started agent containers on other machines, they now wait for nothing — remove them
+there yourself (`docker rm -f` on each).
+
 ### Backing up
 
 Everything that matters is in **`./data`**: the SQLite database `daten.db`, `acme.json` with
@@ -412,7 +426,6 @@ edit it while the stack is running.** Two writers destroy it.
 ```sh
 docker compose logs -f tecgated
 docker compose logs -f contentguard
-docker compose logs -f dockerguard
 ```
 
 Set `LOG_STUFE: DEBUG` in `docker-compose.yml` for more, `LOG_FORM` to anything other than
@@ -507,9 +520,6 @@ than accepting the setting and quietly ignoring it:
 - **`tecgated` runs as uid 1000 without capabilities** and is PID 1: it supervises Traefik,
   which binds 80 and 443 through `net.ipv4.ip_unprivileged_port_start: 80` in the compose file.
   The data directory and named volumes must belong to uid 1000.
-- **The Docker socket is still on the machine.** The guard narrows what TecGate can ask for
-  to two read-only calls; it does not remove the socket. A third call is only ever added
-  together with the feature that needs it.
 - **Rate limiting and "internal only" are enforced by Traefik**, not by TecGate's own check
   chain. They behave slightly differently from the other rule kinds as a result — they are
   earlier and cheaper, and they do not appear in the same counters.
