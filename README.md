@@ -195,14 +195,42 @@ defaults to `latest`; pin it if you would rather choose yourself when the softwa
 
 ---
 
-## What the two containers are
+## What the three containers are
 
-Both run the **same image** and differ only in their entrypoint.
+All run the **same image** and differ only in their entrypoint.
 
 | Service | What it is | Network | Ports |
 |---|---|---|---|
 | `tecgated` | The server: interface, API, and Traefik as its child process | default | 80, 443 (TCP and UDP), 8090, 8091 |
 | `contentguard` | Coraza with the OWASP Core Rule Set | default | none published |
+| `vrrp` | keepalived for a standby pair (optional, idle otherwise) | host | none published |
+
+**`vrrp` does nothing on a single instance.** It only reports the host's network interfaces
+into the shared `vrrp` volume and sleeps. Once two TecGates are paired (Settings › Operation
+› Standby) and VRRP is switched on there, TecGate writes the keepalived configuration into
+that volume and the service holds the shared floating address. It needs host networking
+and the capabilities `NET_ADMIN`, `NET_BROADCAST` and `NET_RAW` — nothing else. You may
+delete the service from your compose file if you never pair a standby.
+
+### Standby instance (optional)
+
+A second TecGate can stand by for the first one:
+
+1. On the primary: Settings › Operation › Standby › *Pair standby* shows a one-time code
+   (valid 15 minutes), the primary's address and the fingerprint of its interface
+   certificate.
+2. On the standby (a fresh install — the setup wizard offers it — or the same tab): enter
+   the primary's address and the code, compare the fingerprint, confirm.
+3. The standby pulls every 60 seconds: the configuration, the users (with their second
+   factors, never their sessions), the active bans and, for domains without Hetzner DNS,
+   the certificates. Secrets travel sealed with the pairing key and are sealed again with
+   the standby's own key. The standby is **read-only**; change things on the primary.
+4. For automatic failover, set the floating address, the network interface and the VRRP id
+   in the same tab on the primary (the interface on each instance itself). Both run as
+   VRRP backup with priority 150 (primary) and 100 (standby); the standby takes the
+   address when the primary's health check fails, and the primary takes it back after
+   five healthy minutes. Point your router's port forwarding at the floating address
+   only after you have tested a failover.
 
 **No Docker access.** No container mounts the Docker socket, and TecGate never talks to
 the Docker daemon. A proxy host points at an address and a port; what runs behind it is

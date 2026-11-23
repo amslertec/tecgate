@@ -39,6 +39,9 @@ services:
       # and says so in the interface. It backs up either way.
       - ./backups:/backup
       - contenttargets:/contenttargets
+      # Shared with the vrrp service below (standby instance only): TecGate
+      # writes keepalived.conf here. Harmless on a single instance.
+      - vrrp:/vrrp
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is missing - see .env.example}
       ZERT_NAMEN: ${CERT_NAMES:?CERT_NAMES is missing - see .env.example}
@@ -96,5 +99,41 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  # Standby instance only (optional): holds the shared floating address with
+  # keepalived (VRRP). Same image, own entrypoint. It stays idle until VRRP
+  # is switched on in Settings > Operation > Standby — floating address,
+  # network interface and VRRP id are set there, never here; TecGate then
+  # writes the keepalived configuration into the shared "vrrp" volume and
+  # this service reloads it. Host networking and the three network
+  # capabilities are what VRRP needs; nothing else is granted.
+  vrrp:
+    image: amslertec/tecgate:${TECGATE_VERSION:-latest}
+    container_name: tecgate-vrrp
+    entrypoint: ["/usr/local/bin/tecgate-vrrp"]
+    # keepalived must run as root to use the capabilities below; group 1000
+    # (tecgated's) lets it read keepalived.conf and write its state into the
+    # shared directory without CAP_DAC_OVERRIDE.
+    user: "0:1000"
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - vrrp:/vrrp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 64m
+    memswap_limit: 64m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
 volumes:
   contenttargets:
+  vrrp:
