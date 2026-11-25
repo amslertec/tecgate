@@ -570,18 +570,22 @@ than accepting the setting and quietly ignoring it:
 
 ## Licence and mark
 
-**The documentation and the example files in this repository are MIT** — see
-[`LICENSE`](LICENSE). There is no source code here, so that is what the licence covers:
-`README.md`, `DOCKERHUB.md`, `docker-compose.yml` and `.env.example`. Copy them, change
-them, use them in your own setup.
+TecGate is under the **TecGate Software License 1.0** — see [`LICENSE`](LICENSE); the same
+text ships inside the image at `/usr/share/licenses/tecgate/LICENSE`. In short:
 
-**The image is not covered by it.** `amslertec/tecgate` is distributed from Docker Hub, and
-its terms travel inside it: `/usr/share/licenses/tecgate/LICENSE` and
-`/usr/share/licenses/owasp-crs/LICENSE`. The bundled **OWASP Core Rule Set is Apache-2.0**
-and keeps its own obligations — MIT here does not lift them. The image comes with no
-warranty of any kind.
+- **Free to use**, privately and commercially, on as many machines and hosts as you like,
+  for your own services and those of your organisation. No account, no key.
+- **Not allowed:** reselling or redistributing the software or modified images,
+  decompiling it, or offering it to others as a hosted service without written permission.
+- **The documentation and the example files in this repository** (`README.md`,
+  `DOCKERHUB.md`, `docker-compose.yml`, `.env.example`) may be copied and adapted to set up
+  and run TecGate.
+- **No warranty, no support.** Liability is excluded as far as Swiss law allows.
 
-**The name, the mark and the wordmark are not covered either.** A wordmark is a trademark,
-not software; released under MIT, anyone could put it on a product of their own. Passing it
-on unchanged in order to refer to TecGate is fine — using it as your own mark, or for a
-derived product, is not. The terms are in [`TRADEMARK.md`](TRADEMARK.md).
+The bundled **Traefik is MIT** and the **OWASP Core Rule Set is Apache-2.0**; both keep
+their own licences (`/usr/share/licenses/traefik/LICENSE`,
+`/usr/share/licenses/owasp-crs/LICENSE`).
+
+**The name, the mark and the wordmark are excluded.** Passing them on unchanged in order to
+refer to TecGate is fine — using them as your own mark, or for another product, is not.
+The terms are in [`TRADEMARK.md`](TRADEMARK.md).

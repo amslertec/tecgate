@@ -1,67 +1,79 @@
-MIT License
+TecGate Software License
+Version 1.0, 25 November 2026
 
-Copyright (c) 2026 amslertec
+Copyright (c) 2026 Pascal Amsler (Amslertec), Switzerland. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This license applies to the TecGate software as distributed in the Docker image
+amslertec/tecgate (the "Software"), from version 1.0.0 onwards. It is a
+proprietary license: the Software is licensed, not sold, and its source code is
+not published.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Free use
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+   You may install and use the Software free of charge, for private and for
+   commercial purposes, on as many machines and with as many hosts as you like,
+   to protect and run your own services and those of your organisation. No
+   account, registration or license key is required.
 
---------------------------------------------------------------------------
-What the licence above covers in THIS repository
---------------------------------------------------------------------------
+2. Restrictions
 
-This repository contains no source code. For the purposes of the licence
-above, "the Software" is what this repository actually holds: the
-documentation (README.md, DOCKERHUB.md), the Compose file
-(docker-compose.yml) and the environment template (.env.example). Copy
-them, change them, use them in your own setup, ship them with your own
-work -- MIT, nothing further asked.
+   Unless Swiss law expressly allows it, you may not:
+   a) copy, sell, rent, sublicense or redistribute the Software or modified
+      images of it; pulling the official images and running them is allowed;
+   b) decompile, disassemble or otherwise reverse engineer the Software, or try
+      to obtain its source code;
+   c) remove or alter any notice of ownership or any license text shipped with
+      the Software;
+   d) offer the Software to third parties as a hosted service (software as a
+      service, or a managed reverse proxy or web application firewall run for
+      others) without written permission from the licensor.
 
---------------------------------------------------------------------------
-What it does NOT cover: the container image
---------------------------------------------------------------------------
+3. Documentation and example files
 
-The TecGate image (docker.io/amslertec/tecgate) is distributed from Docker
-Hub, not from this repository, and the grant above says nothing about it.
-Its terms travel inside it: the image carries its licence texts at
-/usr/share/licenses/tecgate/LICENSE and
-/usr/share/licenses/owasp-crs/LICENSE, and those are the ones that apply
-to the software it runs -- among them the Apache License 2.0 of the
-bundled OWASP Core Rule Set, whose obligations MIT does not lift.
+   The documentation and the example files (README.md, DOCKERHUB.md,
+   docker-compose.yml, .env.example) published for the Software may be copied
+   and adapted to set up, run and describe the Software.
 
-Two things follow, and neither is a formality:
+4. Name, mark and wordmark
 
-  - Reading or copying this repository grants no right in the image.
-  - The image is supplied with no warranty of any kind either. This is
-    one installation's tooling, published in case it is useful, not a
-    product with support behind it.
+   This license grants no right in the name "TecGate", the TecGate mark or the
+   wordmark. Passing them on unchanged in order to refer to TecGate is
+   permitted; using them as your own mark or for another product is not. The
+   terms in full are in TRADEMARK.md, published with the documentation.
 
---------------------------------------------------------------------------
-What it does NOT cover: name, mark and wordmark
---------------------------------------------------------------------------
+5. Third-party components
 
-The licence above does not cover the name "TecGate", the mark, or the
-wordmark (marke/logo-wortmarke-hell.svg, marke/logo-wortmarke-dunkel.svg,
-and the same mark as it appears inside the interface).
+   The Software contains open-source components. Each of them stays under its
+   own license, and this license does not restrict any right those licenses
+   grant you. Among them:
 
-A wordmark is a trademark, not software: released under MIT, anyone could
-put it on a product of their own. Passing it on unchanged in order to
-refer to TecGate is permitted; using it as your own mark, or for a derived
-product, is not. The terms in full are in TRADEMARK.md.
+     Traefik                   MIT License         /usr/share/licenses/traefik/LICENSE
+     OWASP Core Rule Set       Apache License 2.0  /usr/share/licenses/owasp-crs/LICENSE
+     (embedded in the Software together with its license headers)
 
-This does not restrict anything you may do with TecGate -- it separates
-the work from the attribution.
+6. No warranty
+
+   The Software is provided "as is". It sits in front of the services you
+   publish and decides which requests reach them; you are responsible for how
+   you configure, secure and back up your systems. To the extent permitted by
+   law, no warranty is given that the Software is free of errors or fit for a
+   particular purpose. There is no support and no release schedule.
+
+7. Liability
+
+   To the extent permitted by law, liability for damages arising from the use
+   of the Software, including loss of data, downtime or lost profit, is
+   excluded. Liability for intent and gross negligence remains (Art. 100 of the
+   Swiss Code of Obligations).
+
+8. Termination
+
+   This license ends automatically if you breach it. You must then stop using
+   the Software. Sections 6, 7 and 9 continue to apply.
+
+9. Applicable law and jurisdiction
+
+   This license is governed by Swiss law, excluding its conflict-of-law rules
+   and the United Nations Convention on Contracts for the International Sale of
+   Goods. The place of jurisdiction is the domicile of the licensor, subject to
+   mandatory consumer jurisdiction.

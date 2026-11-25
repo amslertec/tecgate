@@ -1,7 +1,7 @@
 # TecGate: name, mark and wordmark
 
-**The mark is excluded from the code licence.** A wordmark is a trademark, not software. Released under MIT, anyone
-could put it on a product of their own — and that is exactly what a trademark
+**The mark is excluded from the software licence.** A wordmark is a trademark, not software. Released with the
+documentation and example files, anyone could put it on a product of their own — and that is exactly what a trademark
 exists to prevent.
 
 This file applies to:
@@ -42,10 +42,10 @@ And to the **name “TecGate”** itself.
 
 ---
 
-## Why this is here although everything else is free
+## Why this is here although the documentation is free to copy
 
-The documentation and the example files in this repository are MIT, and that is
-intended. A trademark has a different job: it says **where something comes
+The documentation and the example files in this repository may be copied and
+adapted, and that is intended. A trademark has a different job: it says **where something comes
 from**. Released on the same terms, a repackaged version could appear under the
 same name and mark, and nobody could tell the two apart. That does not harm the
 author, it harms the reader.
